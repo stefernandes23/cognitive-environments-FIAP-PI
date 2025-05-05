@@ -1,6 +1,6 @@
 # 🧠 Projeto Final - Cognitive Environments (8DTSR)
 
-Este projeto foi desenvolvido como parte da disciplina **Plataformas Cognitivas** no curso de MBA em Data Science e Inteligência Artificial. O sistema automatiza o processo de validação de identidade de um usuário utilizando imagens de documentos e selfies, com foco na **segurança contra fraudes**.
+Este projeto foi desenvolvido como parte da disciplina **Cognitive Environments** no curso de MBA em Data Science e Inteligência Artificial. O sistema automatiza o processo de validação de identidade de um usuário utilizando imagens de documentos e selfies, com foco na **segurança contra fraudes**.
 
 ---
 
