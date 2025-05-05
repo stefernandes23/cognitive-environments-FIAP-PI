@@ -145,8 +145,12 @@ with tab1:
             doc_text = extract_text_from_image(doc_id_bytes)
             bill_text = extract_text_from_image(bill.getvalue())
             
-            doc_name = extract_name(doc_text)
-            bill_name = extract_name(bill_text)
+          doc_names = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', doc_text)
+          bill_names = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', bill_text)
+
+        # Compare os nomes possíveis e veja se algum bate
+           matched_name = next((name for name in doc_names if name.lower() in [n.lower() for n in bill_names]), None)
+
 
             st.write("Texto do documento extraído:", doc_text)
             st.write("Texto do boleto extraído:", bill_text)
