@@ -46,13 +46,6 @@ Criar uma pipeline inteligente para validar automaticamente a identidade de uma 
   
 ---
 
-## 📊 Resultados
-
-- Precisão da verificação de nome: **96%**
-- Taxa de autenticação facial correta: **93%**
-- Sucesso na detecção de vivacidade: **91%**
-
----
 
 # Analisador Facial com AWS Rekognition
 
