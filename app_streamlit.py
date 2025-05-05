@@ -91,41 +91,40 @@ def detect_liveness(image_bytes):
 
 # Extrator de nome com regex
 def extract_name(text):
-    # Padrões prioritários (documentos oficiais)
+    # Padrões específicos para documentos brasileiros
     doc_patterns = [
-        r'NOME:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',  # RG/CNH
-        r'NOME\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',    # Sem dois pontos
-        r'Nome:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',   # Minúsculo
-        r'([A-ZÀ-Ü][A-ZÀ-Ü]+\s+[A-ZÀ-Ü][A-ZÀ-Ü]+)'                 # Nome completo em maiúsculas
+        r'NOME:\s*([A-ZÀ-Ü\s]+)(?=\n|$|CPF|RG|DOC)',  # Padrão de RG/CNH
+        r'NOME\s*([A-ZÀ-Ü\s]+)(?=\n|$|CPF|RG|DOC)',    # Sem dois pontos
+        r'Nome:\s*([A-ZÀ-Ü][a-zà-ü]+\s[A-ZÀ-Ü][a-zà-ü]+)',  # Formato misto
+        r'NOME\s*DO\s*TITULAR:\s*([A-ZÀ-Ü\s]+)'  # Para cartões/cnh
     ]
     
-    # Padrões para boletos/faturas
+    # Padrões para boletos
     bill_patterns = [
-        r'Cliente:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',
-        r'Nome:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',
-        r'Titular:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',
-        r'([A-ZÀ-Ü][a-zà-ü]+\s+[A-ZÀ-Ü][a-zà-ü]+)(?=\n|$)'
+        r'(?:NOME|NOME DO CLIENTE|TITULAR):\s*([A-ZÀ-Ü\s]+)(?=\n|$)',
+        r'Cliente:\s*([A-ZÀ-Ü][a-zà-ü]+\s[A-ZÀ-Ü][a-zà-ü]+)',
+        r'^([A-ZÀ-Ü][A-ZÀ-Ü\s]+)(?=\n|$|\d{3}\.\d{3}\.\d{3})'  # Nome no início do texto
     ]
     
-    excluidos = {
-        "Social", "Name", "Federal", "Secretaria", "CPF", "CNPJ", 
-        "RG", "Documento", "Valor", "Vencimento", "Cliente"
+    blacklist = {
+        "REPUBLICA", "FEDERATIVA", "BRASIL", "DOCUMENTO", "IDENTIDADE",
+        "CPF", "RG", "CNH", "ORGAO", "EXPEDICAO", "VALIDADE"
     }
     
-    # Primeiro tenta padrões de documento
+    # Primeiro tenta extrair do documento
     for pattern in doc_patterns:
-        matches = re.findall(pattern, text)
-        for match in matches:
-            name = match.strip() if isinstance(match, str) else match[0].strip()
-            if not any(excl in name for excl in excluidos) and len(name.split()) >= 2:
+        match = re.search(pattern, text)
+        if match:
+            name = match.group(1).strip()
+            if not any(word in name for word in blacklist) and 2 <= len(name.split()) <= 4:
                 return name
     
-    # Se não encontrar, tenta padrões de boleto
+    # Depois tenta padrões de boleto
     for pattern in bill_patterns:
-        matches = re.findall(pattern, text)
-        for match in matches:
-            name = match.strip() if isinstance(match, str) else match[0].strip()
-            if not any(excl in name for excl in excluidos) and len(name.split()) >= 2:
+        match = re.search(pattern, text)
+        if match:
+            name = match.group(1).strip()
+            if not any(word in name for word in blacklist):
                 return name
     
     return None
