@@ -13,6 +13,9 @@ Criar uma pipeline inteligente para validar automaticamente a identidade de uma 
 - Detecção de vivacidade (liveness)
 - Decisão automatizada de autenticação ou encaminhamento para atendimento
 
+
+<img width="520" alt="image" src="https://github.com/user-attachments/assets/5bb9201d-bd26-4f48-8ed6-0001aadc86d6" />
+
 ---
 
 ## 🧰 Tecnologias Utilizadas
@@ -62,8 +65,7 @@ Criar uma pipeline inteligente para validar automaticamente a identidade de uma 
 O app desenvolvido usa AWS Rekognition para análise facial. Você pode acessá-lo através do seguinte link:
 
 👉 [Acesse a aplicação no Streamlit](https://faceandtextextractor.streamlit.app/)
-
-<img width="520" alt="image" src="https://github.com/user-attachments/assets/5bb9201d-bd26-4f48-8ed6-0001aadc86d6" />
+<img width="887" alt="image" src="https://github.com/user-attachments/assets/83031f69-df27-492e-a985-7477a2973b4a" />
 
 
 # Alunos 👨‍🎓👩‍🎓
