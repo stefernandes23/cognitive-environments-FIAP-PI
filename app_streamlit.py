@@ -6,6 +6,14 @@ import tempfile
 import matplotlib.pyplot as plt
 import sys
 
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    import subprocess
+    import sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "matplotlib"])
+    import matplotlib.pyplot as plt
+    
 # Configuração da página
 st.set_page_config(
     page_title="FIAP - Cognitive Environments",
