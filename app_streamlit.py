@@ -192,22 +192,22 @@ def main():
                     st.success(f"✅ Válido ({face_result['similarity']:.2f}%)")
                 else:
                     st.error("❌ Falha no reconhecimento facial")
-
+                    
            with colr2:
-                st.subheader("📝 Nome")
-                
-                if not doc_name and not bill_name:
-                    st.error("Nomes não encontrados. Verifique a qualidade das imagens.")
-                    with st.expander("🔍 Detalhes da extração"):
-                        st.write("**Padrões tentados no documento:**")
-                        st.code(r'Nome\s*[/]?\s*Name[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)')
-                        st.write("**Texto analisado (documento):**")
-                        st.text(doc_text[:200] + "...")
+               st.subheader("📝 Nome")
+    
+               if not doc_name and not bill_name:
+                   st.error("Nomes não encontrados. Verifique a qualidade das imagens.")
+                   with st.expander("🔍 Detalhes da extração"):
+                       st.write("**Padrões tentados no documento:**")
+                       st.code(r'Nome\s*[/]?\s*Name[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)')
+                       st.write("**Texto analisado (documento):**")
+                       st.text(doc_text[:200] + "...")
                         
-                        st.write("Padrões tentados no boleto:")
-                        st.code(r'^([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n|\d|Código|Vencimento)')
-                        st.write("Texto analisado (boleto):")
-                        st.text(bill_text[:200] + "...")
+                       st.write("Padrões tentados no boleto:")
+                       st.code(r'^([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n|\d|Código|Vencimento)')
+                       st.write("Texto analisado (boleto):")
+                       st.text(bill_text[:200] + "...")
                 
                 elif doc_name.lower() == bill_name.lower():
                     st.success(f"✅ Nomes coincidem\n\n{doc_name}")
