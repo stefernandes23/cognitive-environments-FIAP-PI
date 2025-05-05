@@ -26,7 +26,7 @@ st.markdown("""
 **Validação em 3 etapas:**
 1. 👀 Comparação facial (Selfie vs Documento)
 2. ✍️ Verificação de nome (Documento vs Boleto)
-3. 💡 Análise de vitalidade (É uma pessoa real?)
+3. 💡 Análise de Liveness (É uma pessoa real?)
 """)
 st.markdown("---")  # Linha divisória
 
@@ -122,7 +122,7 @@ def detect_liveness(image_bytes):
         details = f"Olhos {'abertos' if eyes_open else 'fechados'}, {'sorrindo' if smile else 'neutro'}"
         return vital, details
     except Exception as e:
-        st.error(f"Erro na detecção de vitalidade: {str(e)}")
+        st.error(f"Erro na detecção de Liveness: {str(e)}")
         return False, "Erro na análise"
 
 # ✍️ Função para extrair nomes dos documentos
@@ -272,9 +272,9 @@ with tab1:
                 if not bill_name:
                     st.error("Nome não extraído do boleto")
 
-        # 💡 Resultado da vitalidade
+        # 💡 Resultado da Liveness
         with colr3:
-            st.subheader("💡 Vitalidade")
+            st.subheader("💡 Liveness")
             if liveness:
                 st.success(f"✅ Pessoa real detectada\n{liveness_details}")
             else:
