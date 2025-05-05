@@ -296,4 +296,4 @@ with tab2:
 
 # Rodapé
 st.markdown("---")
-st.caption("FIAP Cognitive Environments | © 2023 | Versão 3.0")
+st.caption("FIAP Cognitive Environments")
