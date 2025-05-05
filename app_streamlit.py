@@ -91,8 +91,20 @@ def detect_liveness(image_bytes):
 
 def extract_name(text):
     import re
-    matches = re.findall(r'([A-Z][a-z]+(?:\s[A-Z][a-z]+)+)', text)
-    return matches[0] if matches else None
+
+    # Tentativa 1: Buscar padrão "Nome / Name" ou "Nome Social / Social Name"
+    match = re.search(r'(Nome\s*\/\s*Name|Nome\s*Social\s*\/\s*Social\s*Name)\s*([A-Z][A-Z\s]+)', text)
+    if match:
+        nome = match.group(2).strip()
+        return nome.title()
+
+    # Tentativa 2: Buscar uma linha que pareça um nome completo (com 2 a 4 palavras com iniciais maiúsculas)
+    matches = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', text)
+    if matches:
+        return matches[0].strip()
+
+    return None
+
 
 # Interface principal
 tab1, tab2 = st.tabs(["Validação Completa", "Configurações"])
