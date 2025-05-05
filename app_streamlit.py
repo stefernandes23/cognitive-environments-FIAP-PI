@@ -105,4 +105,112 @@ with tab1:
                     st.write(f"**Faixa etária:** {age_range} anos")
                     
                     # Emoções
-                    emotions =
+                    emotions = sorted(face['Emotions'], key=lambda x: x['Confidence'], reverse=True)
+                    st.subheader("Análise Emocional")
+                    for emotion in emotions[:3]:
+                        st.progress(int(emotion['Confidence']), 
+                                  f"{emotion['Type']}: {emotion['Confidence']:.1f}%")
+            else:
+                st.error("Nenhum rosto detectado no documento. Por favor, tente novamente.")
+
+with tab2:
+    st.header("2. Verificação com Selfie")
+    
+    if 'doc_bytes' not in st.session_state:
+        st.warning("Por favor, carregue um documento válido na aba 'Documento' primeiro.")
+    else:
+        verification_method = st.radio("Método de verificação:", 
+                                     ["Tirar foto", "Carregar arquivo"])
+        
+        if verification_method == "Tirar foto":
+            selfie = st.camera_input("Tire uma selfie para verificação")
+            if selfie:
+                st.session_state.selfie_bytes = selfie.getvalue()
+        else:
+            selfie_file = st.file_uploader("Carregue sua selfie", type=["jpg", "jpeg", "png"])
+            if selfie_file:
+                st.session_state.selfie_bytes = selfie_file.getvalue()
+                st.image(Image.open(selfie_file), caption="Selfie carregada", use_column_width=True)
+        
+        if 'selfie_bytes' in st.session_state:
+            confidence = st.slider("Limiar de confiança", 70, 100, 85)
+            
+            if st.button("Verificar Identidade"):
+                with st.spinner("Comparando rostos..."):
+                    match, details = compare_faces(
+                        st.session_state.doc_bytes,
+                        st.session_state.selfie_bytes,
+                        confidence
+                    )
+                
+                if match:
+                    similarity = details[0]['Similarity']
+                    st.balloons()
+                    st.success(f"✅ Identidade verificada! Similaridade: {similarity:.2f}%")
+                    
+                    # Análise adicional da selfie
+                    selfie_analysis = analyze_document_face(st.session_state.selfie_bytes)
+                    if selfie_analysis:
+                        st.subheader("Análise da Selfie")
+                        face = selfie_analysis[0]
+                        st.write(f"**Olhos abertos:** {'Sim' if face['EyesOpen']['Value'] else 'Não'} ({face['EyesOpen']['Confidence']:.1f}%)")
+                        st.write(f"**Sorriso:** {'Sim' if face['Smile']['Value'] else 'Não'} ({face['Smile']['Confidence']:.1f}%)")
+                else:
+                    st.error("❌ Identidade não verificada. Por favor, tente novamente.")
+
+with tab3:
+    st.header("3. Busca em Multidão")
+    
+    if 'doc_bytes' not in st.session_state:
+        st.warning("Por favor, carregue um documento válido na aba 'Documento' primeiro.")
+    else:
+        crowd_file = st.file_uploader("Carregue foto com múltiplas pessoas", type=["jpg", "jpeg", "png"])
+        
+        if crowd_file:
+            col1, col2 = st.columns(2)
+            with col1:
+                crowd_img = Image.open(crowd_file)
+                st.image(crowd_img, caption="Imagem da multidão", use_column_width=True)
+            
+            confidence = st.slider("Limiar de confiança para busca", 70, 100, 80)
+            
+            if st.button("Procurar na Multidão"):
+                with st.spinner("Analisando imagem..."):
+                    crowd_bytes = crowd_file.getvalue()
+                    faces = detect_faces_in_image(crowd_bytes)
+                    draw = ImageDraw.Draw(crowd_img)
+                    found = False
+                    
+                    for face in faces:
+                        box = face['BoundingBox']
+                        width, height = crowd_img.size
+                        left = int(box['Left'] * width)
+                        top = int(box['Top'] * height)
+                        right = left + int(box['Width'] * width)
+                        bottom = top + int(box['Height'] * height)
+                        
+                        # Recortar e comparar cada rosto
+                        face_crop = crowd_img.crop((left, top, right, bottom))
+                        with io.BytesIO() as buffer:
+                            face_crop.save(buffer, format="JPEG")
+                            face_bytes = buffer.getvalue()
+                        
+                        match, details = compare_faces(st.session_state.doc_bytes, face_bytes, confidence)
+                        
+                        if match:
+                            draw.rectangle([left, top, right, bottom], outline="green", width=5)
+                            draw.text((left, top-30), f"Match: {details[0]['Similarity']:.1f}%", fill="green")
+                            found = True
+                        else:
+                            draw.rectangle([left, top, right, bottom], outline="red", width=2)
+                    
+                    with col2:
+                        st.image(crowd_img, caption="Resultado da busca", use_column_width=True)
+                        if found:
+                            st.success("Pessoa encontrada na multidão!")
+                        else:
+                            st.warning("Pessoa não encontrada na multidão.")
+
+# Rodapé
+st.markdown("---")
+st.caption("FIAP Cognitive Environments | © 2023 | Versão 2.0")
