@@ -3,7 +3,7 @@ import boto3
 import re
 from PIL import Image
 
-# Page configuration
+# Configuração da página
 st.set_page_config(
     page_title="FIAP - Validador Biométrico",
     page_icon="🆔",
@@ -20,7 +20,7 @@ st.markdown("""
 """)
 st.markdown("---")
 
-# Secure AWS client function
+# Função segura para obter clientes AWS
 def get_aws_client(service):
     try:
         if "AWS" in st.secrets:
@@ -37,25 +37,25 @@ def get_aws_client(service):
                 aws_secret_access_key=st.secrets["aws_secret_access_key"],
                 region_name='us-east-1'
             )
-        raise KeyError("AWS credentials not found")
+        raise KeyError("Credenciais AWS não encontradas")
     except Exception as e:
         st.error(f"""
-        🚨 AWS Connection Error: {str(e)}
+        🚨 Erro de conexão com AWS: {str(e)}
         
-        Please configure your credentials:
-        1. Locally: create `.streamlit/secrets.toml`
-        2. Cloud: Go to Settings → Secrets
+        Por favor configure suas credenciais:
+        1. Local: crie `.streamlit/secrets.toml`
+        2. Cloud: vá em Settings → Secrets
         
-        Required format:
+        Formato requerido:
         ```toml
         [AWS]
-        AWS_ACCESS_KEY_ID = "your_key"
-        AWS_SECRET_ACCESS_KEY = "your_secret"
+        AWS_ACCESS_KEY_ID = "sua_chave"
+        AWS_SECRET_ACCESS_KEY = "seu_segredo"
         ```
         """)
         st.stop()
 
-# Initialize AWS clients
+# Inicializa os clientes AWS
 rekognition = get_aws_client('rekognition')
 textract = get_aws_client('textract')
 
@@ -64,7 +64,7 @@ def extract_text_from_image(image_bytes):
         response = textract.detect_document_text(Document={'Bytes': image_bytes})
         return " ".join([item["Text"] for item in response["Blocks"] if item["BlockType"] == "LINE"])
     except Exception as e:
-        st.error(f"OCR Error: {str(e)}")
+        st.error(f"Erro no OCR: {str(e)}")
         return ""
 
 def compare_faces(source_bytes, target_bytes, threshold=90):
@@ -82,7 +82,7 @@ def compare_faces(source_bytes, target_bytes, threshold=90):
             'face': response['FaceMatches'][0]['Face']
         }
     except Exception as e:
-        st.error(f"Face comparison error: {str(e)}")
+        st.error(f"Erro na comparação facial: {str(e)}")
         return {'status': False, 'error': str(e)}
 
 def detect_liveness(image_bytes):
@@ -92,18 +92,18 @@ def detect_liveness(image_bytes):
             Attributes=['ALL']
         )
         if not response['FaceDetails']:
-            return False, "No face detected"
+            return False, "Nenhum rosto detectado"
         
         face = response['FaceDetails'][0]
         eyes_open = face['EyesOpen']['Value']
         smile = face['Smile']['Value']
         
         vital = eyes_open and not smile
-        details = f"Eyes {'open' if eyes_open else 'closed'}, {'smiling' if smile else 'neutral'}"
+        details = f"Olhos {'abertos' if eyes_open else 'fechados'}, {'sorrindo' if smile else 'neutro'}"
         return vital, details
     except Exception as e:
-        st.error(f"Liveness detection error: {str(e)}")
-        return False, "Analysis error"
+        st.error(f"Erro na detecção de vitalidade: {str(e)}")
+        return False, "Erro na análise"
 
 def extract_name(text, doc_type):
     if doc_type == "doc":
@@ -137,7 +137,7 @@ def extract_name(text, doc_type):
     
     return None
 
-# Main interface
+# Interface principal
 tab1, tab2 = st.tabs(["Validação Completa", "Configurações"])
 
 with tab1:
@@ -167,4 +167,91 @@ with tab1:
             st.error("Por favor, envie todos os documentos!")
             st.stop()
 
-        with st.spinner("Process
+        with st.spinner("Processando..."):
+            selfie_bytes = selfie.getvalue()
+            doc_id_bytes = doc_id.getvalue()
+            bill_bytes = bill.getvalue()
+
+            face_result = compare_faces(doc_id_bytes, selfie_bytes)
+            doc_text = extract_text_from_image(doc_id_bytes)
+            bill_text = extract_text_from_image(bill_bytes)
+            doc_name = extract_name(doc_text, "doc")
+            bill_name = extract_name(bill_text, "bill")
+            liveness, liveness_details = detect_liveness(selfie_bytes)
+
+        with st.expander("🔍 Textos extraídos (diagnóstico)"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.text_area("Texto do Documento", doc_text, height=150)
+            with col2:
+                st.text_area("Texto do Boleto", bill_text, height=150)
+
+        st.markdown("---")
+        st.header("Resultados da Validação")
+        colr1, colr2, colr3 = st.columns(3)
+
+        with colr1:
+            st.subheader("👤 Confronto Facial")
+            if face_result['status']:
+                st.success(f"✅ Válido ({face_result['similarity']:.2f}%)")
+            else:
+                st.error("❌ Falha no reconhecimento facial")
+
+        with colr2:
+            st.subheader("📝 Nome")
+            if not doc_name and not bill_name:
+                st.error("Nomes não encontrados. Verifique a qualidade das imagens.")
+            elif doc_name and bill_name:
+                clean_doc_name = ' '.join(doc_name.replace("Nome Social", "").split())
+                clean_bill_name = ' '.join(bill_name.split())
+                
+                for suffix in [" da", " de", " dos"]:
+                    clean_doc_name = re.sub(fr'{suffix}\s+\w+$', '', clean_doc_name, flags=re.IGNORECASE)
+                    clean_bill_name = re.sub(fr'{suffix}\s+\w+$', '', clean_bill_name, flags=re.IGNORECASE)
+                
+                if clean_doc_name.lower() == clean_bill_name.lower():
+                    st.success(f"✅ Nomes coincidem\n\n{clean_doc_name}")
+                else:
+                    doc_parts = clean_doc_name.split()
+                    bill_parts = clean_bill_name.split()
+                    
+                    if (len(doc_parts) >= 2 and len(bill_parts) >= 2 and
+                        doc_parts[0].lower() == bill_parts[0].lower() and
+                        doc_parts[-1].lower() == bill_parts[-1].lower()):
+                        
+                        st.success("✅ Nomes essencialmente iguais")
+                        st.write(f"• Documento: {clean_doc_name}")
+                        st.write(f"• Boleto: {clean_bill_name}")
+                    else:
+                        st.warning("⚠️ Diferença encontrada nos nomes")
+                        st.write(f"• Documento: {clean_doc_name}")
+                        st.write(f"• Boleto: {clean_bill_name}")
+            else:
+                st.error("Nomes não puderam ser comparados")
+                if not doc_name:
+                    st.error("Nome não extraído do documento")
+                if not bill_name:
+                    st.error("Nome não extraído do boleto")
+
+        with colr3:
+            st.subheader("💡 Vitalidade")
+            if liveness:
+                st.success(f"✅ Pessoa real detectada\n{liveness_details}")
+            else:
+                st.warning(f"⚠️ {liveness_details}")
+
+        # Conclusão
+        if (face_result['status'] and doc_name and bill_name and 
+            doc_name.lower() == bill_name.lower() and liveness):
+            st.balloons()
+            st.success("🎉 Identidade validada com sucesso!")
+        else:
+            st.error("❌ Falha na validação. Verifique os dados enviados.")
+
+with tab2:
+    st.header("Configurações")
+    confidence_threshold = st.slider("Limiar de confiança facial", 70, 100, 90)
+    st.info("Ajuste o limiar de similaridade conforme necessário.")
+
+st.markdown("---")
+st.caption("FIAP Cognitive Environments | © 2023 | Versão 3.0")
