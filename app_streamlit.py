@@ -22,16 +22,45 @@ st.markdown("""
 """)
 st.markdown("---")
 
-# Inicialização do cliente Rekognition
+# Função para obter o cliente Rekognition com tratamento de erros
 @st.cache_resource
 def get_rekognition_client():
-    return boto3.client(
-        'rekognition',
-        aws_access_key_id=st.secrets["AWS"]["AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=st.secrets["AWS"]["AWS_SECRET_ACCESS_KEY"],
-        region_name='us-east-1'
-    )
+    try:
+        # Tenta primeiro com a estrutura padrão (namespace AWS)
+        return boto3.client(
+            'rekognition',
+            aws_access_key_id=st.secrets["AWS"]["AWS_ACCESS_KEY_ID"],
+            aws_secret_access_key=st.secrets["AWS"]["AWS_SECRET_ACCESS_KEY"],
+            region_name='us-east-1'
+        )
+    except KeyError:
+        try:
+            # Se falhar, tenta com estrutura alternativa (sem namespace)
+            return boto3.client(
+                'rekognition',
+                aws_access_key_id=st.secrets["aws_access_key_id"],
+                aws_secret_access_key=st.secrets["aws_secret_access_key"],
+                region_name='us-east-1'
+            )
+        except KeyError as e:
+            st.error("""
+            **Erro de configuração das credenciais AWS:**
+            
+            1. Crie um arquivo `.streamlit/secrets.toml` na raiz do projeto com:
+            ```
+            [AWS]
+            AWS_ACCESS_KEY_ID = "sua_chave_aqui"
+            AWS_SECRET_ACCESS_KEY = "seu_segredo_aqui"
+            ```
+            
+            2. Ou configure no Streamlit Cloud em:
+            Manage App → Settings → Secrets
+            
+            3. Verifique se as credenciais têm permissão para o Amazon Rekognition
+            """)
+            st.stop()
 
+# Inicializa o cliente Rekognition
 rekognition_client = get_rekognition_client()
 
 # Funções principais
