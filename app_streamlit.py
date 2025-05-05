@@ -2,32 +2,32 @@ import streamlit as st
 import boto3
 from PIL import Image
 import os
+import io
 import tempfile
 import matplotlib.pyplot as plt
 import sys
+from datetime import datetime
 
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    import subprocess
-    import sys
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "matplotlib"])
-    import matplotlib.pyplot as plt
-    
 # Configuração da página
 st.set_page_config(
-    page_title="FIAP - Cognitive Environments",
-    page_icon="🧠",
+    page_title="FIAP - Validador Biométrico",
+    page_icon="🆔",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # Título do aplicativo
-st.title("🔍 Validação Biométrica com AWS Rekognition")
+st.title("🆔 Validador de Identidade FIAP")
+st.markdown("""
+**Validação em 3 etapas:**
+1. Confronto facial (Selfie vs Documento)
+2. Verificação de nome (Documento vs Boleto)
+3. Análise de vitalidade
+""")
 st.markdown("---")
 
-# Funções do seu notebook adaptadas
-def configure_aws():
+# Configuração AWS (usando secrets do Streamlit)
+def get_aws_client():
     return boto3.client(
         'rekognition',
         aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
@@ -35,149 +35,154 @@ def configure_aws():
         region_name='us-east-1'
     )
 
-def validar_imagem(image_bytes, extensoes_validas=('.jpg', '.jpeg', '.png'), 
-                  tamanho_min=(100, 100), tamanho_max=(5000, 5000), 
-                  tamanho_max_mb=5):
+# Funções
+def extract_text_from_image(image_bytes):
+    textract = boto3.client(
+        'textract',
+        aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=st.secrets["AWS_SECRET_ACCESS_KEY"],
+        region_name='us-east-1'
+    )
     try:
-        # Verifica tamanho do arquivo
-        if len(image_bytes) / (1024 ** 2) > tamanho_max_mb:
-            return False, "Arquivo excede tamanho permitido"
-        
-        # Verifica extensão (assumindo que o upload já filtra)
-        
-        # Verifica dimensões
-        with Image.open(io.BytesIO(image_bytes)) as img:
-            width, height = img.size
-            if not (tamanho_min[0] <= width <= tamanho_max[0]) or not (tamanho_min[1] <= height <= tamanho_max[1]):
-                return False, "Dimensões fora dos limites"
-            
-            img.verify()
-        
-        return True, "Imagem válida"
-    
+        response = textract.detect_document_text(Document={'Bytes': image_bytes})
+        return " ".join([item["Text"] for item in response["Blocks"] if item["BlockType"] == "LINE"])
     except Exception as e:
-        return False, f"Erro na validação: {str(e)}"
+        st.error(f"Erro no OCR: {str(e)}")
+        return ""
 
-def analyze_face(image_bytes):
-    rekognition = configure_aws()
+def compare_faces(source_bytes, target_bytes, threshold=90):
+    rekognition = get_aws_client()
+    try:
+        response = rekognition.compare_faces(
+            SourceImage={'Bytes': source_bytes},
+            TargetImage={'Bytes': target_bytes},
+            SimilarityThreshold=threshold
+        )
+        if not response['FaceMatches']:
+            return {'status': False, 'similarity': response['UnmatchedFaces'][0]['Similarity'] if response['UnmatchedFaces'] else 0}
+        return {
+            'status': True,
+            'similarity': response['FaceMatches'][0]['Similarity'],
+            'face': response['FaceMatches'][0]['Face']
+        }
+    except Exception as e:
+        st.error(f"Erro na comparação facial: {str(e)}")
+        return {'status': False, 'error': str(e)}
+
+def detect_liveness(image_bytes):
+    rekognition = get_aws_client()
     try:
         response = rekognition.detect_faces(
             Image={'Bytes': image_bytes},
             Attributes=['ALL']
         )
-        return response['FaceDetails'][0] if response['FaceDetails'] else None
+        if not response['FaceDetails']:
+            return False
+        
+        face = response['FaceDetails'][0]
+        emotions = [e for e in face['Emotions'] if e['Confidence'] > 80]
+        
+        # Pelo menos 2 emoções com alta confiança
+        return len(emotions) >= 2
     except Exception as e:
-        st.error(f"Erro na análise facial: {str(e)}")
-        return None
+        st.error(f"Erro na detecção de vitalidade: {str(e)}")
+        return False
 
-def compare_faces(source_bytes, target_bytes, similarity_threshold=90):
-    rekognition = configure_aws()
-    try:
-        response = rekognition.compare_faces(
-            SourceImage={'Bytes': source_bytes},
-            TargetImage={'Bytes': target_bytes},
-            SimilarityThreshold=similarity_threshold
-        )
-        
-        if not response['FaceMatches']:
-            return {'status': 'Não autenticada', 'similaridade': response['UnmatchedFaces'][0]['Similarity'] if response['UnmatchedFaces'] else 0}
-        
-        best_match = max(response['FaceMatches'], key=lambda x: x['Similarity'])
-        return {
-            'status': 'Autenticada',
-            'similaridade': best_match['Similarity'],
-            'detalhes': best_match['Face']
-        }
-    except Exception as e:
-        st.error(f"Erro na comparação facial: {str(e)}")
-        return {'status': 'Erro', 'detalhes': str(e)}
+def extract_name(text):
+    import re
+    matches = re.findall(r'([A-Z]{3,}\s[A-Z]{3,}\s([A-Z]{3,}\s)?[A-Z]{3,})', text)
+    return matches[0][0] if matches else None
 
 # Interface principal
-tab1, tab2 = st.tabs(["Análise Facial", "Comparação de Imagens"])
+tab1, tab2 = st.tabs(["Validação Completa", "Configurações"])
 
 with tab1:
-    st.header("Análise de Atributos Faciais")
-    uploaded_file = st.file_uploader("Envie uma foto para análise:", type=["jpg", "jpeg", "png"])
+    st.header("1. Upload dos Documentos")
     
-    if uploaded_file:
-        image_bytes = uploaded_file.getvalue()
-        
-        # Validação da imagem
-        is_valid, validation_msg = validar_imagem(image_bytes)
-        if not is_valid:
-            st.error(validation_msg)
-            st.stop()
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(image_bytes, caption="Imagem enviada", use_column_width=True)
-        
-        with st.spinner('Analisando atributos faciais...'):
-            face_details = analyze_face(image_bytes)
-        
-        if face_details:
-            with col2:
-                st.success("Análise concluída!")
-                
-                # Mostrar atributos principais
-                st.subheader("Atributos Detectados")
-                st.metric("Confiança", f"{face_details['Confidence']:.2f}%")
-                st.metric("Idade Estimada", f"{face_details['AgeRange']['Low']}-{face_details['AgeRange']['High']} anos")
-                st.metric("Gênero", f"{face_details['Gender']['Value']} ({face_details['Gender']['Confidence']:.2f}%)")
-                
-                # Emoções
-                emotions = sorted(face_details['Emotions'], key=lambda x: x['Confidence'], reverse=True)
-                st.subheader("Emoções Detectadas")
-                for emotion in emotions[:3]:  # Mostrar apenas as 3 principais
-                    st.progress(emotion['Confidence']/100, text=f"{emotion['Type']}: {emotion['Confidence']:.2f}%")
-                
-                # Detalhes adicionais
-                with st.expander("Ver detalhes técnicos"):
-                    st.json(face_details)
-
-with tab2:
-    st.header("Comparação Facial")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.subheader("Imagem de Referência")
-        ref_image = st.file_uploader("Selecione a imagem de referência:", type=["jpg", "jpeg", "png"], key="ref")
+        st.subheader("📷 Selfie Atual")
+        selfie = st.file_uploader("Sua foto atual (selfie)", type=["jpg", "png"])
+        if selfie:
+            st.image(selfie, use_column_width=True)
     
     with col2:
-        st.subheader("Imagem para Comparar")
-        target_image = st.file_uploader("Selecione a imagem para comparar:", type=["jpg", "jpeg", "png"], key="target")
+        st.subheader("🆔 Documento de Identidade")
+        doc_id = st.file_uploader("Foto do seu documento (RG/CNH)", type=["jpg", "png"])
+        if doc_id:
+            st.image(doc_id, use_column_width=True)
     
-    if ref_image and target_image:
-        similarity_threshold = st.slider("Limiar de Similaridade (%)", 70, 100, 90)
+    with col3:
+        st.subheader("💳 Comprovante (Boleto/Conta)")
+        bill = st.file_uploader("Comprovante com seu nome", type=["jpg", "png"])
+        if bill:
+            st.image(bill, use_column_width=True)
+    
+    if st.button("Validar Identidade", type="primary"):
+        if not all([selfie, doc_id, bill]):
+            st.error("Por favor, envie todos os documentos!")
+            st.stop()
         
-        if st.button("Comparar Imagens"):
-            with st.spinner('Processando comparação...'):
-                ref_bytes = ref_image.getvalue()
-                target_bytes = target_image.getvalue()
-                
-                result = compare_faces(ref_bytes, target_bytes, similarity_threshold)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.image(ref_bytes, caption="Imagem de Referência", use_column_width=True)
-                with col2:
-                    st.image(target_bytes, caption="Imagem para Comparar", use_column_width=True)
-                
-                if result['status'] == 'Autenticada':
-                    st.success(f"✅ Correspondência encontrada! Similaridade: {result['similaridade']:.2f}%")
-                    st.balloons()
+        with st.spinner("Processando validação..."):
+            # Etapa 1: Comparação facial
+            selfie_bytes = selfie.getvalue()
+            doc_id_bytes = doc_id.getvalue()
+            
+            face_result = compare_faces(doc_id_bytes, selfie_bytes)
+            
+            # Etapa 2: Extração de texto
+            doc_text = extract_text_from_image(doc_id_bytes)
+            bill_text = extract_text_from_image(bill.getvalue())
+            
+            doc_name = extract_name(doc_text)
+            bill_name = extract_name(bill_text)
+            
+            # Etapa 3: Detecção de vitalidade
+            liveness = detect_liveness(selfie_bytes)
+            
+            # Resultados
+            st.markdown("---")
+            st.header("Resultados da Validação")
+            
+            cols = st.columns(3)
+            
+            with cols[0]:
+                st.subheader("👤 Confronto Facial")
+                if face_result['status']:
+                    st.success(f"✅ Correspondência válida ({face_result['similarity']:.2f}%)")
                 else:
-                    st.error(f"❌ Não autenticado. Similaridade: {result['similaridade']:.2f}%")
+                    st.error(f"❌ Falha na correspondência ({face_result.get('similarity', 0):.2f}%)")
+            
+            with cols[1]:
+                st.subheader("📝 Confronto de Nome")
+                if doc_name and bill_name and doc_name.lower() == bill_name.lower():
+                    st.success(f"✅ Nomes coincidem\n\nDocumento: {doc_name}\nBoleto: {bill_name}")
+                else:
+                    st.error(f"❌ Nomes diferentes\n\nDocumento: {doc_name or 'Não encontrado'}\nBoleto: {bill_name or 'Não encontrado'}")
+            
+            with cols[2]:
+                st.subheader("💡 Detecção de Vitalidade")
+                if liveness:
+                    st.success("✅ Pessoa real detectada")
+                else:
+                    st.warning("⚠️ Não foi possível confirmar vitalidade")
+            
+            # Verificação final
+            if face_result['status'] and (doc_name and bill_name and doc_name.lower() == bill_name.lower()) and liveness:
+                st.balloons()
+                st.success("🎉 Identidade validada com sucesso!")
+            else:
+                st.error("Falha na validação. Por favor, verifique os documentos.")
 
-# Barra lateral com configurações
-with st.sidebar:
+with tab2:
     st.header("Configurações")
-    st.info("Configure os parâmetros de análise")
-    
-    st.markdown("---")
-    st.write("Desenvolvido por [Seu Nome]")
-    st.write("FIAP - Cognitive Environments")
+    confidence_threshold = st.slider("Limiar de confiança para comparação facial", 70, 100, 90)
+    st.info("Ajuste os parâmetros de validação conforme necessário")
 
 # Rodapé
 st.markdown("---")
-st.caption("© 2023 FIAP - Todos os direitos reservados")
+st.caption("FIAP Cognitive Environments | © 2023 | Versão 1.0")
+
+# Para executar local:
+# streamlit run app_streamlit.py
