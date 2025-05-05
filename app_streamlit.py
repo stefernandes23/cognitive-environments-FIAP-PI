@@ -78,15 +78,16 @@ def detect_liveness(image_bytes):
         )
         if not response['FaceDetails']:
             return False
-        
+
         face = response['FaceDetails'][0]
-        emotions = [e for e in face['Emotions'] if e['Confidence'] > 80]
-        
-        # Pelo menos 2 emoções com alta confiança
-        return len(emotions) >= 2
+        return (
+            face.get("Smile", {}).get("Value") and
+            face.get("EyesOpen", {}).get("Value")
+        )
     except Exception as e:
         st.error(f"Erro na detecção de vitalidade: {str(e)}")
         return False
+
 
 def extract_name(text):
     import re
