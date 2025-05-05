@@ -24,7 +24,7 @@ st.set_page_config(
 st.title("🆔 Validador de Identidade FIAP")
 st.markdown("""
 **Validação em 3 etapas:**
-1. 👀 Confronto facial (Selfie vs Documento)
+1. 👀 Comparação facial (Selfie vs Documento)
 2. ✍️ Verificação de nome (Documento vs Boleto)
 3. 💡 Análise de vitalidade (É uma pessoa real?)
 """)
@@ -223,9 +223,9 @@ with tab1:
         st.header("Resultados da Validação")
         colr1, colr2, colr3 = st.columns(3)
 
-        # 👤 Resultado do confronto facial
+        # 👤 Resultado da comparação facial
         with colr1:
-            st.subheader("👤 Confronto Facial")
+            st.subheader("👤 Comparação Facial")
             if face_result['status']:
                 st.success(f"✅ Válido ({face_result['similarity']:.2f}%)")
             else:
