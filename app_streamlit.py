@@ -145,8 +145,11 @@ with tab1:
             doc_text = extract_text_from_image(doc_id_bytes)
             bill_text = extract_text_from_image(bill.getvalue())
             
-          doc_names = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', doc_text)
-          bill_names = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', bill_text)
+            doc_names = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', doc_text)
+            bill_names = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', bill_text)
+
+            # Compare os nomes possíveis e veja se algum bate
+            matched_name = next((name for name in doc_names if name.lower() in [n.lower() for n in bill_names]), None)
 
         # Compare os nomes possíveis e veja se algum bate
            matched_name = next((name for name in doc_names if name.lower() in [n.lower() for n in bill_names]), None)
@@ -174,7 +177,7 @@ with tab1:
             
             with cols[1]:
                 st.subheader("📝 Confronto de Nome")
-                if doc_name and bill_name and doc_name.lower() == bill_name.lower():
+                if matched_name:
                     st.success(f"✅ Nomes coincidem\n\nDocumento: {doc_name}\nBoleto: {bill_name}")
                 else:
                     st.error(f"❌ Nomes diferentes\n\nDocumento: {doc_name or 'Não encontrado'}\nBoleto: {bill_name or 'Não encontrado'}")
