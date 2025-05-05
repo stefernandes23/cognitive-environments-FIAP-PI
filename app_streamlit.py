@@ -113,19 +113,18 @@ def detect_liveness(image_bytes):
 
 # Extrator de nome robusto para documentos brasileiros
 def extract_name(text, doc_type):
+    def extract_name(text, doc_type):
     # Padrões otimizados para documentos brasileiros
     if doc_type == "doc":
         patterns = [
-            r'(?:Nome\s*[/]?\s*Name|Nome\s*[/]?\s*Name\s*Social)[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n|$|\d|CPF|Sexo)',
+            r'(?:Nome\s*[/]?\s*Name)[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n|$|\d|CPF|Sexo|Nome Social)',
             r'Nome\s*[/]?\s*Name[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)',
-            r'Nome[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)(?=\n|$)',
-            r'([A-ZÀ-Ü]{3,}\s[A-ZÀ-Ü]{3,}\s[A-ZÀ-Ü]{3,})'  # Para nomes completos
+            r'Nome[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)(?=\s*Nome Social)'
         ]
     else:  # Padrões para boletos/faturas
         patterns = [
             r'^([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n|\d|Código|Vencimento)',
-            r'(?:Cliente|Titular|Beneficiário)[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)',
-            r'([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n\d{2}/\d{2}/\d{4})'  # Nome antes da data
+            r'(?:Cliente|Titular|Beneficiário)[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)'
         ]
     
     blacklist = {
@@ -139,7 +138,9 @@ def extract_name(text, doc_type):
         matches = re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE)
         for match in matches:
             name = match.group(1).strip()
-            # Filtra palavras da blacklist e verifica se tem pelo menos 2 partes
+            # Remove "Nome Social" e informações similares
+            name = re.sub(r'\s*Nome Social.*', '', name, flags=re.IGNORECASE)
+            # Filtra palavras da blacklist
             filtered_name = ' '.join([part for part in name.split() 
                                     if part.upper() not in blacklist and len(part) > 2])
             if len(filtered_name.split()) >= 2:
@@ -219,14 +220,26 @@ with tab1:
             st.subheader("📝 Nome")
             if not doc_name and not bill_name:
                 st.error("Nomes não encontrados. Verifique a qualidade das imagens.")
-            elif not doc_name:
-                st.error(f"Nome não encontrado no documento\nBoleto: {bill_name}")
-            elif not bill_name:
-                st.error(f"Documento: {doc_name}\nNome não encontrado no boleto")
-            elif doc_name.lower() == bill_name.lower():
-                st.success(f"✅ Nomes coincidem\n\n{doc_name}")
+            elif doc_name and bill_name:
+                # Remove espaços extras e compara versões normalizadas
+                clean_doc_name = ' '.join(doc_name.split())
+                clean_bill_name = ' '.join(bill_name.split())
+                
+                if clean_doc_name.lower() == clean_bill_name.lower():
+                    st.success(f"✅ Nomes coincidem\n\n{clean_doc_name}")
+                else:
+                    st.warning(f"⚠️ Pequena diferença detectada (provavelmente normal):")
+                    st.write(f"• Documento: {clean_doc_name}")
+                    st.write(f"• Boleto: {clean_bill_name}")
+                    st.info("Diferença pode ser devido a abreviações ou ordem dos nomes")
+                    
+                    # Verifica se os nomes são essencialmente iguais
+                    if (clean_doc_name.split()[0] == clean_bill_name.split()[0] and 
+                        clean_doc_name.split()[-1] == clean_bill_name.split()[-1]):
+                        st.success("✅ Nomes essencialmente iguais (primeiro e último nome coincidem)")
             else:
-                st.error(f"❌ Diferença encontrada\n• Documento: {doc_name}\n• Boleto: {bill_name}")
+                st.error("Nomes não puderam ser comparados")
+
 
         with colr3:
             st.subheader("💡 Vitalidade")
