@@ -90,8 +90,8 @@ def detect_liveness(image_bytes):
 
 def extract_name(text):
     import re
-    matches = re.findall(r'([A-Z]{3,}\s[A-Z]{3,}\s([A-Z]{3,}\s)?[A-Z]{3,})', text)
-    return matches[0][0] if matches else None
+    matches = re.findall(r'([A-Z][a-z]+(?:\s[A-Z][a-z]+)+)', text)
+    return matches[0] if matches else None
 
 # Interface principal
 tab1, tab2 = st.tabs(["Validação Completa", "Configurações"])
@@ -105,7 +105,7 @@ with tab1:
         st.subheader("📷 Selfie Atual")
         selfie = st.file_uploader("Sua foto atual (selfie)", type=["jpg", "png"])
         if selfie:
-            st.image(selfie, use_column_width=True)
+            st.image(selfie, use_container_width=True)
     
     with col2:
         st.subheader("🆔 Documento de Identidade")
@@ -137,6 +137,10 @@ with tab1:
             
             doc_name = extract_name(doc_text)
             bill_name = extract_name(bill_text)
+
+            st.write("Texto do documento extraído:", doc_text)
+            st.write("Texto do boleto extraído:", bill_text)
+
             
             # Etapa 3: Detecção de vitalidade
             liveness = detect_liveness(selfie_bytes)
