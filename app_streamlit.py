@@ -91,26 +91,43 @@ def detect_liveness(image_bytes):
 
 # Extrator de nome com regex
 def extract_name(text):
-    # Padrão mais específico para nomes (evita órgãos governamentais e termos financeiros)
-    patterns = [
-        r'Nome:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',  # Padrão "Nome: FULANO SILVA"
-        r'Nome\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',    # Padrão "Nome FULANO SILVA"
-        r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})(?:\s+[0-9])',  # Nome seguido de números
-        r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})(?=\n|$)'
+    # Padrões prioritários (documentos oficiais)
+    doc_patterns = [
+        r'NOME:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',  # RG/CNH
+        r'NOME\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',    # Sem dois pontos
+        r'Nome:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',   # Minúsculo
+        r'([A-ZÀ-Ü][A-ZÀ-Ü]+\s+[A-ZÀ-Ü][A-ZÀ-Ü]+)'                 # Nome completo em maiúsculas
     ]
     
-    excluidos = {"Vencimento", "Valor", "Claro", "CPF", "CNPJ", "Pagamento", 
-                 "Data", "Código", "Distrito", "Federal", "Secretaria"}
+    # Padrões para boletos/faturas
+    bill_patterns = [
+        r'Cliente:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',
+        r'Nome:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',
+        r'Titular:\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)',
+        r'([A-ZÀ-Ü][a-zà-ü]+\s+[A-ZÀ-Ü][a-zà-ü]+)(?=\n|$)'
+    ]
     
-    for pattern in patterns:
+    excluidos = {
+        "Social", "Name", "Federal", "Secretaria", "CPF", "CNPJ", 
+        "RG", "Documento", "Valor", "Vencimento", "Cliente"
+    }
+    
+    # Primeiro tenta padrões de documento
+    for pattern in doc_patterns:
         matches = re.findall(pattern, text)
         for match in matches:
-            if isinstance(match, tuple):
-                match = match[0]
-            name = match.strip()
-            # Verifica se não contém palavras excluídas
+            name = match.strip() if isinstance(match, str) else match[0].strip()
             if not any(excl in name for excl in excluidos) and len(name.split()) >= 2:
                 return name
+    
+    # Se não encontrar, tenta padrões de boleto
+    for pattern in bill_patterns:
+        matches = re.findall(pattern, text)
+        for match in matches:
+            name = match.strip() if isinstance(match, str) else match[0].strip()
+            if not any(excl in name for excl in excluidos) and len(name.split()) >= 2:
+                return name
+    
     return None
 
 # Interface
