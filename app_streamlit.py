@@ -88,32 +88,41 @@ def detect_liveness(image_bytes):
 
 # Extrator de nome melhorado
 def extract_name(text, doc_type):
-    # Padrões para documentos
+    # Padrões otimizados para documentos brasileiros
     if doc_type == "doc":
+        # Padrão específico para RG/CNH brasileiros
         patterns = [
-            r'NOME[\s:]*([A-ZÀ-Ü][A-ZÀ-Ü\s]+?)(?=\n|$|CPF|RG|DOC|[\d])',
-            r'NOME\s+COMPLETO[\s:]*([A-ZÀ-Ü][A-ZÀ-Ü\s]+)',
-            r'([A-ZÀ-Ü]{3,}\s[A-ZÀ-Ü]{3,})(?=\n|$)'
+            r'(?:Nome\s*[/]?\s*Name|Nome\s*[/]?\s*Name\s*Social)[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n|$|\d|CPF|Sexo)',
+            r'Nome\s*[/]?\s*Name[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)',
+            r'Nome[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)(?=\n|$)'
         ]
     else:  # Padrões para boletos
         patterns = [
-            r'(?:NOME|CLIENTE|TITULAR)[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n|$|\d)',
-            r'Beneficiário[\s:]*([A-ZÀ-Ü][A-ZÀ-Ü\s]+)',
-            r'Pagador[\s:]*([A-ZÀ-Ü][A-ZÀ-Ü\s]+)'
+            r'^([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n|\d|Código|Vencimento)',
+            r'(?:Cliente|Titular|Beneficiário)[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)',
+            r'([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n\d{2}/\d{2}/\d{4})'  # Nome antes da data
         ]
     
     blacklist = {
         "REPUBLICA", "FEDERATIVA", "BRASIL", "DOCUMENTO", "IDENTIDADE",
-        "CPF", "RG", "CNH", "ORGAO", "EXPEDICAO", "VALIDADE", "NACIONAL"
+        "CPF", "RG", "CNH", "ORGAO", "EXPEDICAO", "VALIDADE", "GOVERNO",
+        "ESTADO", "SEGURANÇA", "PÚBLICA", "DISTRITO", "FEDERAL", "SECRETARIA"
     }
     
     for pattern in patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
+        matches = re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE)
         for match in matches:
-            name = ' '.join([part for part in match.split() if part.upper() not in blacklist])
-            if len(name.split()) >= 2:
-                return name.strip()
+            name = match.group(1).strip()
+            # Filtra palavras da blacklist e verifica se tem pelo menos 2 partes
+            filtered_name = ' '.join([part for part in name.split() 
+                                   if part.upper() not in blacklist and len(part) > 2])
+            if len(filtered_name.split()) >= 2:
+                return filtered_name.title()  # Padroniza capitalização
+    
     return None
+
+doc_name = extract_name(doc_text, "doc")
+bill_name = extract_name(bill_text, "bill")
 
 # Interface principal
 def main():
@@ -184,18 +193,26 @@ def main():
                 else:
                     st.error("❌ Falha no reconhecimento facial")
 
-            with colr2:
+           with colr2:
                 st.subheader("📝 Nome")
+                
                 if not doc_name and not bill_name:
-                    st.error("Nomes não encontrados em ambos os documentos")
-                elif not doc_name:
-                    st.error(f"Nome não encontrado no documento\nBoleto: {bill_name}")
-                elif not bill_name:
-                    st.error(f"Documento: {doc_name}\nNome não encontrado no boleto")
+                    st.error("Nomes não encontrados. Verifique a qualidade das imagens.")
+                    with st.expander("🔍 Detalhes da extração"):
+                        st.write("**Padrões tentados no documento:**")
+                        st.code(r'Nome\s*[/]?\s*Name[\s:]*([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+)')
+                        st.write("**Texto analisado (documento):**")
+                        st.text(doc_text[:200] + "...")
+                        
+                        st.write("Padrões tentados no boleto:")
+                        st.code(r'^([A-ZÀ-Ü][A-ZÀ-Üa-zà-ü\s]+?)(?=\n|\d|Código|Vencimento)')
+                        st.write("Texto analisado (boleto):")
+                        st.text(bill_text[:200] + "...")
+                
                 elif doc_name.lower() == bill_name.lower():
                     st.success(f"✅ Nomes coincidem\n\n{doc_name}")
                 else:
-                    st.error(f"❌ Nomes diferentes\nDocumento: {doc_name}\nBoleto: {bill_name}")
+                    st.error(f"❌ Diferença encontrada\n• Documento: {doc_name or 'N/A'}\n• Boleto: {bill_name or 'N/A'}")
 
             with colr3:
                 st.subheader("💡 Vitalidade")
