@@ -44,6 +44,11 @@ def extract_text_from_image(image_bytes):
         st.error(f"Erro no OCR: {str(e)}")
         return ""
 
+    # Adicione isso após a extração dos textos
+    st.subheader("Textos Extraídos (Debug)")
+    st.text_area("Texto do Documento", doc_text, height=150)
+    st.text_area("Texto do Boleto", bill_text, height=150)
+
 # Função para comparar rostos
 def compare_faces(source_bytes, target_bytes, threshold=90):
     rekognition = get_aws_client()
@@ -75,9 +80,10 @@ def detect_liveness(image_bytes):
         if not response['FaceDetails']:
             return False
         face = response['FaceDetails'][0]
+        # Verifica apenas se os olhos estão abertos OU se não está sorrindo (relaxado)
         return (
-            face.get("Smile", {}).get("Value") and
-            face.get("EyesOpen", {}).get("Value")
+            face.get("EyesOpen", {}).get("Value", False) or
+            not face.get("Smile", {}).get("Value", True)
         )
     except Exception as e:
         st.error(f"Erro na detecção de vitalidade: {str(e)}")
@@ -85,11 +91,26 @@ def detect_liveness(image_bytes):
 
 # Extrator de nome com regex
 def extract_name(text):
-    nomes = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', text)
-    excluidos = {"Vencimento Valor", "Claro", "CPF", "CNPJ", "Pagamento", "Data", "Código"}
-    for nome in nomes:
-        if nome not in excluidos and len(nome.split()) >= 2:
-            return nome.strip()
+    # Padrão mais específico para nomes (evita órgãos governamentais e termos financeiros)
+    patterns = [
+        r'Nome:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',  # Padrão "Nome: FULANO SILVA"
+        r'Nome\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',    # Padrão "Nome FULANO SILVA"
+        r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})(?:\s+[0-9])',  # Nome seguido de números
+        r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})(?=\n|$)'
+    ]
+    
+    excluidos = {"Vencimento", "Valor", "Claro", "CPF", "CNPJ", "Pagamento", 
+                 "Data", "Código", "Distrito", "Federal", "Secretaria"}
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        for match in matches:
+            if isinstance(match, tuple):
+                match = match[0]
+            name = match.strip()
+            # Verifica se não contém palavras excluídas
+            if not any(excl in name for excl in excluidos) and len(name.split()) >= 2:
+                return name
     return None
 
 # Interface
