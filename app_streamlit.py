@@ -1,4 +1,4 @@
-"'''
+'''
 🪄 FIAP - Validador Biométrico Mágico 🪄
 
 Este é um programa que usa magia da computação para verificar se:
@@ -55,16 +55,15 @@ def get_aws_client(service):
         🚨 Erro de conexão com AWS: {str(e)}
         
         Por favor configure suas credenciais:
-        1. Local: crie .streamlit/secrets.toml
+        1. Local: crie `.streamlit/secrets.toml`
         2. Cloud: vá em Settings → Secrets
         
         Formato requerido:
-        
-toml
+        ```toml
         [AWS]
         AWS_ACCESS_KEY_ID = "sua_chave"
         AWS_SECRET_ACCESS_KEY = "seu_segredo"
-
+        ```
         """)
         st.stop()  # Para o programa se não tiver conexão
 
@@ -297,4 +296,4 @@ with tab2:
 
 # Rodapé
 st.markdown("---")
-st.caption("FIAP Cognitive Environments") ! ajuste os parametros para TAMBÉM captar dados de uma CNH: 
+st.caption("FIAP Cognitive Environments")
