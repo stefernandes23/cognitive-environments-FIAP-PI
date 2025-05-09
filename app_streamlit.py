@@ -80,9 +80,9 @@ def detect_liveness(image_bytes):
 
 
 def extract_name(text):
-    pattern = r'(?:Nome|Name)\s*[:]?\s*([A-ZÀ-Üa-zà-ü\s]+)'
+    pattern = r'(?:Nome|Name)[:\s]+([A-ZÀ-Üa-zà-ü\s]+)'
     match = re.search(pattern, text)
-    return match.group(1).strip() if match else None
+    return match.group(1).strip() if match else "Nome não encontrado"
 
 selfie = st.file_uploader("Selfie", type=["jpg", "png"])
 doc_id = st.file_uploader("Documento (RG/CNH)", type=["jpg", "png"])
@@ -109,7 +109,7 @@ if st.button("Validar"):
     st.write(f"Válido: {face_result['status']}, Similaridade: {face_result['similarity']}%")
 
     st.write("**Validação de Nome**")
-    if doc_name and bill_name:
+    if doc_name != "Nome não encontrado" and bill_name != "Nome não encontrado":
         if doc_name.lower() == bill_name.lower():
             st.success("Nomes coincidem!")
         else:
