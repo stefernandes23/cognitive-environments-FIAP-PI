@@ -51,7 +51,7 @@ Criar uma pipeline inteligente para validar automaticamente a identidade de uma 
 
 O app desenvolvido usa AWS Rekognition para análise facial. Você pode acessá-lo através do seguinte link:
 
-👉 [Acesse a aplicação no Streamlit](https://faceandtextextractor.streamlit.app/)
+
 <img width="887" alt="image" src="https://github.com/user-attachments/assets/83031f69-df27-492e-a985-7477a2973b4a" />
 
 
